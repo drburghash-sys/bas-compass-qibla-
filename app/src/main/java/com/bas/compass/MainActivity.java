@@ -291,7 +291,7 @@ public final class MainActivity extends Activity implements SensorEventListener,
 
     private void setCoordinates(double a,double b,String title,boolean userSelected) {
         if (!valid(a,b)) return;
-        lat=a;lon=b;place=title; manual=userSelected;
+        lat=a;lon=b;place=title; manual=userSelected; heading=Double.NaN;
         bearing=bearingTo(a,b,KAABA_LAT,KAABA_LON);
         distance=distanceTo(a,b,KAABA_LAT,KAABA_LON);
         try { declination = new GeomagneticField((float)a,(float)b,0,System.currentTimeMillis()).getDeclination(); }
@@ -320,7 +320,7 @@ public final class MainActivity extends Activity implements SensorEventListener,
     }
     @Override public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            magnetic = new float[]{event.values[0],event.values[1],event.values[2]};
+            System.arraycopy(event.values, 0, magnetic, 0, 3);
             haveMag=true;
             fieldStrength=Math.sqrt(magnetic[0]*magnetic[0]+magnetic[1]*magnetic[1]+magnetic[2]*magnetic[2]);
         } else if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
