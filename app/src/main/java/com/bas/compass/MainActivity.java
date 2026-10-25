@@ -192,6 +192,11 @@ public final class MainActivity extends Activity implements SensorEventListener,
         mapButton.setBackground(panelShape(true));
         mapButton.setOnClickListener(v -> openMapVerification());
         root.addView(mapButton,new LinearLayout.LayoutParams(-1,dp(55)));
+        gap(root,9);
+        TextView mosquesButton=label("🕌  المساجد القريبة",16,gold(),true);
+        mosquesButton.setBackground(panelShape(false));
+        mosquesButton.setOnClickListener(v -> openMosqueSearch());
+        root.addView(mosquesButton,new LinearLayout.LayoutParams(-1,dp(55)));
         gap(root,12);
 
         LinearLayout controls = new LinearLayout(this); controls.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -243,6 +248,20 @@ public final class MainActivity extends Activity implements SensorEventListener,
                 } else if (i == choices.length - 1) manualCoordinates();
                 else setCoordinates(CITIES[i-1][0], CITIES[i-1][1], CITY_NAMES[i-1], true);
             }).show();
+    }
+
+    private void openMosqueSearch() {
+        if(!valid(lat,lon)) {
+            Toast.makeText(this,"حدد موقعك أولاً للبحث عن المساجد",Toast.LENGTH_LONG).show();
+            chooseLocation();
+            return;
+        }
+        Intent intent=new Intent(this,NearbyMosquesActivity.class);
+        intent.putExtra("latitude",lat);
+        intent.putExtra("longitude",lon);
+        intent.putExtra("place",place);
+        intent.putExtra("manual",manual);
+        startActivity(intent);
     }
 
     private void openMapVerification() {
