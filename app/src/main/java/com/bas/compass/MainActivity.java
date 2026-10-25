@@ -3,6 +3,7 @@ package com.bas.compass;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -50,12 +51,17 @@ public final class MainActivity extends Activity implements SensorEventListener,
     private SharedPreferences prefs;
     private SensorManager sensorManager;
     private LocationManager locationManager;
-    private Sensor rotationSensor, accelSensor, magneticSensor;
+    private Sensor rotationSensor, accelSensor, magneticSensor, gyroSensor;
     private final float[] accel = new float[3], magnetic = new float[3];
     private boolean haveAccel, haveMag, manual, night = true, vibrating = true, qiblaMode = true, aligned;
     private boolean locationActive;
     private double lat = Double.NaN, lon = Double.NaN, bearing = Double.NaN, distance = Double.NaN;
     private double declination, heading = Double.NaN, tilt = Double.NaN, fieldStrength = Double.NaN;
+    private double expectedField = Double.NaN;
+    private final double[] recentHeadings = new double[14];
+    private final long[] recentTimes = new long[14];
+    private int historyCount, historyIndex;
+    private long lastHeadingUpdate, lastHeadingSample, lastGyroMotion;
     private String place = "لم يتم تحديد الموقع";
     private int magneticAccuracy = -1;
     private long lastRender, lastVibration;
@@ -80,6 +86,7 @@ public final class MainActivity extends Activity implements SensorEventListener,
             rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
             accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             magneticSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+            gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         }
         buildUi();
     }
@@ -90,6 +97,7 @@ public final class MainActivity extends Activity implements SensorEventListener,
             if (rotationSensor != null) sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_UI);
             else if (accelSensor != null) sensorManager.registerListener(this, accelSensor, SensorManager.SENSOR_DELAY_UI);
             if (magneticSensor != null) sensorManager.registerListener(this, magneticSensor, SensorManager.SENSOR_DELAY_UI);
+            if (gyroSensor != null) sensorManager.registerListener(this, gyroSensor, SensorManager.SENSOR_DELAY_UI);
         }
         if (!manual) {
             if (hasLocationPermission()) startLocation();
@@ -179,7 +187,12 @@ public final class MainActivity extends Activity implements SensorEventListener,
 
         accuracyText = label("", 14, secondary(), false);
         accuracyText.setBackground(panelShape(false));
-        root.addView(accuracyText); gap(root, 12);
+        root.addView(accuracyText); gap(root, 11);
+        TextView mapButton=label("⌖  التحقق من القبلة بالخريطة",16,gold(),true);
+        mapButton.setBackground(panelShape(true));
+        mapButton.setOnClickListener(v -> openMapVerification());
+        root.addView(mapButton,new LinearLayout.LayoutParams(-1,dp(55)));
+        gap(root,12);
 
         LinearLayout controls = new LinearLayout(this); controls.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         TextView where = label("⌖ الموقع", 15, gold(), true);
@@ -200,14 +213,17 @@ public final class MainActivity extends Activity implements SensorEventListener,
     private void settingsDialog() {
         String[] choices = {"التبديل إلى الوضع " + (night ? "النهاري" : "الليلي"),
                 "الاهتزاز عند محاذاة القبلة: " + (vibrating ? "مفعل" : "متوقف"),
-                "إرشادات معايرة البوصلة"};
+                "إرشادات معايرة البوصلة", "شرح فحص موثوقية الاتجاه"};
         new AlertDialog.Builder(this).setTitle("إعدادات BAS Compass")
             .setItems(choices, (d, which) -> {
                 if (which == 0) { night = !night; prefs.edit().putBoolean("night", night).apply(); buildUi(); }
                 else if (which == 1) { vibrating = !vibrating; prefs.edit().putBoolean("vibrate", vibrating).apply(); updateUi(); }
-                else new AlertDialog.Builder(this).setTitle("معايرة البوصلة")
+                else if (which == 2) new AlertDialog.Builder(this).setTitle("معايرة البوصلة")
                     .setMessage("حرّك الهاتف ببطء على شكل رقم ٨ عدة مرات بعيداً عن المعادن والمغناطيس، ثم ضعه مستوياً وأعد المقارنة مع اتجاه معروف. لا يمكن ضمان الدقة إذا كان المستشعر معطلاً.")
                     .setPositiveButton("حسناً", null).show();
+                else new AlertDialog.Builder(this).setTitle("فحص موثوقية الاتجاه")
+                    .setMessage("نعرض المجال المتوقع من نموذج الأرض في موقعك، ونقارن قراءته بالمستشعر مع فحص معايرة البوصلة وثبات الاتجاه. حتى القراءة الطبيعية لا تثبت صحة اتجاه الشمال. شاشة الخريطة تستخدم الإحداثيات فقط ولا تعتمد على البوصلة.")
+                    .setPositiveButton("فهمت",null).show();
             }).setNegativeButton("إغلاق",null).show();
     }
 
@@ -229,6 +245,18 @@ public final class MainActivity extends Activity implements SensorEventListener,
             }).show();
     }
 
+    private void openMapVerification() {
+        if(!valid(lat,lon) || !Double.isFinite(bearing)) {
+            Toast.makeText(this,"حدد الموقع أولاً",Toast.LENGTH_LONG).show();
+            chooseLocation();
+            return;
+        }
+        Intent intent=new Intent(this,QiblaMapActivity.class);
+        intent.putExtra("latitude",lat);
+        intent.putExtra("longitude",lon);
+        intent.putExtra("place",place);
+        startActivity(intent);
+    }
     private void manualCoordinates() {
         LinearLayout box = vertical(); box.setPadding(dp(22),dp(9),dp(22),0);
         EditText latitudeInput = new EditText(this); latitudeInput.setHint("خط العرض، مثال 29.9697");
@@ -292,10 +320,14 @@ public final class MainActivity extends Activity implements SensorEventListener,
     private void setCoordinates(double a,double b,String title,boolean userSelected) {
         if (!valid(a,b)) return;
         lat=a;lon=b;place=title; manual=userSelected; heading=Double.NaN;
+        historyCount=0; historyIndex=0; lastHeadingSample=0; lastHeadingUpdate=0;
         bearing=bearingTo(a,b,KAABA_LAT,KAABA_LON);
         distance=distanceTo(a,b,KAABA_LAT,KAABA_LON);
-        try { declination = new GeomagneticField((float)a,(float)b,0,System.currentTimeMillis()).getDeclination(); }
-        catch (Exception ex) { declination=0; }
+        try {
+            GeomagneticField earth=new GeomagneticField((float)a,(float)b,0,System.currentTimeMillis());
+            declination=earth.getDeclination();
+            expectedField=earth.getFieldStrength()/1000.0; // nT -> µT
+        } catch(Exception ex) { declination=0; expectedField=Double.NaN; }
         aligned=false;
         if (userSelected) {
             stopLocation();
@@ -319,6 +351,12 @@ public final class MainActivity extends Activity implements SensorEventListener,
         return 12742.0176*Math.asin(Math.min(1,Math.sqrt(a)));
     }
     @Override public void onSensorChanged(SensorEvent event) {
+        if(event.sensor.getType()==Sensor.TYPE_GYROSCOPE) {
+            double motion=Math.sqrt(event.values[0]*event.values[0]+event.values[1]*event.values[1]+event.values[2]*event.values[2]);
+            if(motion>0.13) lastGyroMotion=SystemClock.elapsedRealtime();
+            updateUiThrottled();
+            return;
+        }
         if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
             System.arraycopy(event.values, 0, magnetic, 0, 3);
             haveMag=true;
@@ -336,6 +374,14 @@ public final class MainActivity extends Activity implements SensorEventListener,
         float[] angles = new float[3];
         SensorManager.getOrientation(matrix,angles);
         double measured = norm(Math.toDegrees(angles[0]) + declination);
+        long now=SystemClock.elapsedRealtime(); lastHeadingUpdate=now;
+        if(now-lastHeadingSample>=130) {
+            recentHeadings[historyIndex]=measured;
+            recentTimes[historyIndex]=now;
+            historyIndex=(historyIndex+1)%recentHeadings.length;
+            if(historyCount<recentHeadings.length) historyCount++;
+            lastHeadingSample=now;
+        }
         heading = Double.isFinite(heading) ? norm(heading + difference(measured,heading)*0.22) : measured;
         tilt = Math.max(Math.abs(Math.toDegrees(angles[1])),Math.abs(Math.toDegrees(angles[2])));
         updateUiThrottled();
@@ -348,11 +394,58 @@ public final class MainActivity extends Activity implements SensorEventListener,
         long now = SystemClock.elapsedRealtime();
         if (now - lastRender >= 90) { lastRender=now; updateUi(); }
     }
-    private boolean sensorReliable() {
-        return Double.isFinite(heading) && (!Double.isFinite(tilt) || tilt < 55)
-            && (magneticAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
-                || magneticAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH)
-            && (!Double.isFinite(fieldStrength) || (fieldStrength >= 20 && fieldStrength <= 75));
+    // 0 unreliable; 1 uncertain; 2 provisionally stable (not a guarantee).
+    private double fieldError() {
+        return Double.isFinite(expectedField) && expectedField>0 && Double.isFinite(fieldStrength)
+            ? Math.abs(fieldStrength-expectedField)/expectedField : Double.NaN;
+    }
+    private boolean stableHeading(long now) {
+        int count=0;long first=now; double x=0,y=0;
+        for(int i=0;i<historyCount;i++) {
+            if(now-recentTimes[i]>1700)continue;
+            x+=Math.cos(Math.toRadians(recentHeadings[i]));
+            y+=Math.sin(Math.toRadians(recentHeadings[i]));
+            first=Math.min(first,recentTimes[i]);count++;
+        }
+        if(count<6 || now-first<750)return false;
+        double mean=norm(Math.toDegrees(Math.atan2(y,x)));
+        for(int i=0;i<historyCount;i++)
+            if(now-recentTimes[i]<=1700 && Math.abs(difference(recentHeadings[i],mean))>5.5)return false;
+        return true;
+    }
+    private int qualityLevel() {
+        long now=SystemClock.elapsedRealtime();
+        if(!Double.isFinite(heading)||now-lastHeadingUpdate>2800)return 0;
+        if(magneticAccuracy==SensorManager.SENSOR_STATUS_UNRELIABLE)return 0;
+        if(Double.isFinite(fieldStrength)&&(fieldStrength<15||fieldStrength>85))return 0;
+        double error=fieldError();
+        if(Double.isFinite(error)&&error>0.30)return 0;
+        if(Double.isFinite(tilt)&&tilt>=55)return 1;
+        if(magneticAccuracy!=SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+            && magneticAccuracy!=SensorManager.SENSOR_STATUS_ACCURACY_HIGH)return 1;
+        if(!Double.isFinite(error)||error>0.18)return 1;
+        if(gyroSensor!=null&&now-lastGyroMotion<1100)return 1;
+        return stableHeading(now)?2:1;
+    }
+    private boolean sensorReliable() {return qualityLevel()==2;}
+    private String qualityMessage(int quality) {
+        if(!Double.isFinite(heading)||SystemClock.elapsedRealtime()-lastHeadingUpdate>2800)
+            return "⛔ الاتجاه غير موثوق: لا توجد قراءة حديثة.";
+        if(magneticAccuracy==SensorManager.SENSOR_STATUS_UNRELIABLE)
+            return "⛔ المستشعر أبلغ عن قراءة غير موثوقة.";
+        if((Double.isFinite(fieldStrength)&&(fieldStrength<15||fieldStrength>85))
+            ||(Double.isFinite(fieldError())&&fieldError()>0.30))
+            return "⛔ تشويش محتمل: المجال بعيد عن المتوقع في موقعك.";
+        if(Double.isFinite(tilt)&&tilt>=55)return "⚠ ضع الهاتف مستوياً.";
+        if(magneticAccuracy==SensorManager.SENSOR_STATUS_ACCURACY_LOW)
+            return "⚠ دقة الحساس منخفضة: عايره بحركة ٨ بعيداً عن المعادن.";
+        if(magneticAccuracy<0)return "⚠ دقة المستشعر غير معلنة؛ تحقق من الاتجاه.";
+        if(!Double.isFinite(fieldError()))return "⚠ بيانات المجال غير كافية للحكم.";
+        if(fieldError()>0.18)return "⚠ المجال مختلف عن المتوقع؛ ابتعد عن المعادن.";
+        if(gyroSensor!=null&&SystemClock.elapsedRealtime()-lastGyroMotion<1100)
+            return "⚠ الهاتف يتحرك: ثبت الهاتف لفحص الاتجاه.";
+        if(quality==1)return "⚠ الاتجاه لم يستقر بعد: ثبت الهاتف لحظة.";
+        return "✓ اتجاه مستقر مبدئياً، لكنه ليس ضماناً لصحة القبلة.";
     }
     private void updateUi() {
         if (locationText == null) return;
@@ -370,7 +463,9 @@ public final class MainActivity extends Activity implements SensorEventListener,
             else if (!hasHeading) instructionText.setText("الزاوية محسوبة، لكن مستشعر الاتجاه غير متاح");
             else {
                 double turn=difference(bearing,heading);
-                if (Math.abs(turn) <= 3) instructionText.setText("✓ أنت باتجاه القبلة تقريباً");
+                if (Math.abs(turn) <= 3) instructionText.setText(sensorReliable()
+                    ? "✓ محاذاة تقريبية واتجاه مستقر"
+                    : "⚠ محاذاة ظاهرية: تحقق من دقة البوصلة");
                 else instructionText.setText(String.format(Locale.US,"أدر الهاتف %s %.0f°",turn>0?"يميناً":"يساراً",Math.abs(turn)));
                 long now=SystemClock.elapsedRealtime();
                 boolean currentlyAligned=Math.abs(turn)<=3 && sensorReliable();
@@ -389,15 +484,15 @@ public final class MainActivity extends Activity implements SensorEventListener,
             : "لم تتوفر قراءة اتجاه حية");
         detailsText.setText(hasFix ? String.format(Locale.US,"زاوية القبلة: %.1f°   •   المسافة إلى الكعبة: %,.0f كم\nانحراف مغناطيسي: %+.1f°  •  موقع: %.4f, %.4f",
                  bearing,distance,declination,lat,lon) : "لا توجد إحداثيات معتمدة. لا تستخدم زاوية افتراضية.");
-        String quality;
-        if (!hasHeading) quality="⚠ لا يمكن تحديد اتجاه الهاتف. تحقق من وجود المستشعر.";
-        else if (Double.isFinite(tilt) && tilt>=55) quality="⚠ أمسك الهاتف مستوياً لتحديد الاتجاه بدقة أفضل.";
-        else if (Double.isFinite(fieldStrength) && (fieldStrength<20 || fieldStrength>75))
-            quality="⚠ تداخل مغناطيسي محتمل، أبعد الهاتف عن المعادن.";
-        else if (magneticAccuracy<2) quality="⚠ دقة البوصلة غير مؤكدة. حرّك الهاتف على شكل ٨ لمعايرتها.";
-        else quality="✓ قراءة المستشعر مقبولة، لكنها تحتاج التحقق عند الاستخدام الفعلي.";
-        accuracyText.setText(quality + (Double.isFinite(fieldStrength) ?
-            String.format(Locale.US,"\nالمجال المغناطيسي: %.1f µT",fieldStrength) : ""));
+        int quality=qualityLevel();
+        accuracyText.setText(qualityMessage(quality)
+            +(Double.isFinite(fieldStrength)?String.format(Locale.US,"\nالمجال المقاس: %.1f µT",fieldStrength):"\nالمجال المقاس: غير متاح")
+            +(Double.isFinite(expectedField)?String.format(Locale.US,"  •  المتوقع هنا: %.1f µT",expectedField):"")
+            +(Double.isFinite(fieldError())?String.format(Locale.US,"\nالفرق عن المتوقع: %.0f%%",fieldError()*100):"")
+            +"\nالتحقق بالخريطة لا يعتمد على المستشعر.");
+        accuracyText.setTextColor(quality==2?Color.parseColor(night?"#91D8B4":"#207A53")
+            :quality==1?Color.parseColor(night?"#F4C786":"#976B1E")
+            :Color.parseColor(night?"#FF9B94":"#B43B35"));
         face.invalidate();
     }
     private static String directionName(double h) {
