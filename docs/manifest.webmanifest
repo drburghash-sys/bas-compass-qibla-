@@ -1,0 +1,19 @@
+{
+  "name": "BAS قبلة البر - بدون إنترنت",
+  "short_name": "قبلة البر",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a1525",
+  "theme_color": "#0a1525",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
