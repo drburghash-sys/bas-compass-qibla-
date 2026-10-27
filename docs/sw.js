@@ -1,5 +1,5 @@
 "use strict";
-const CACHE="bas-qibla-offline-v1";
+const CACHE="bas-qibla-offline-v2";
 const ASSETS=["./","./index.html","./app.js","./wmm.js","./manifest.webmanifest","./icon.svg"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
