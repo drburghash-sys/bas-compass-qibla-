@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a1525"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>BAS قبلة البر • بلا إنترنت</title>
+<style>
+*{box-sizing:border-box}html{background:#081421}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif;background:radial-gradient(ellipse at 50% -10%,#234050 0%,#0a1828 52%,#07111e 100%);color:#eef6f3;min-height:100vh;padding:20px 14px 45px}
+main{max-width:560px;margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0 18px}h1{margin:0;font-size:23px}p{margin:0}.muted{color:#9bb1ba;font-size:13px;line-height:1.6}.tag{border:1px solid #426b64;color:#aef9cd;padding:7px 12px;border-radius:50px;font-size:12px;white-space:nowrap}
+.card{background:linear-gradient(135deg,#14283a,#0e1e2d);border:1px solid #304857;border-radius:22px;padding:18px;margin:12px 0;box-shadow:0 9px 28px #0003}
+.status{padding:12px 14px;border-radius:14px;background:#20334c;color:#d5e7f1;font-size:13px;line-height:1.75;margin-bottom:14px}.status[data-kind=good]{background:#143e34;color:#bcf8df}.status[data-kind=warn]{background:#403527;color:#f2dfb5}.status[data-kind=bad]{background:#542928;color:#ffd2c8}
+.compass{width:min(78vw,332px);height:min(78vw,332px);border-radius:50%;margin:20px auto 8px;position:relative;border:9px solid #45606a;box-shadow:inset 0 0 0 2px #af9c74,0 0 0 3px #132c38,0 13px 40px #0007;background:repeating-conic-gradient(from 0deg,#cad9db50 0deg 1deg,transparent 1deg 15deg),radial-gradient(circle,#162f3f 0%,#122233 70%);display:grid;place-items:center}
+.dir{position:absolute;font-size:18px;font-weight:700;color:#e5d8ae}.n{top:10px;left:50%;transform:translateX(-50%);color:#f7dfbb}.e{left:11px;top:50%;transform:translateY(-50%)}.s{bottom:8px;left:50%;transform:translateX(-50%)}.w{right:11px;top:50%;transform:translateY(-50%)}
+.needle{position:absolute;top:50%;left:50%;width:126px;height:126px;transform:translate(-50%,-50%) rotate(0deg);transition:transform .18s ease-out;pointer-events:none}
+.needle svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 4px 9px #0008)}.center{position:relative;z-index:2;border-radius:50%;width:16px;height:16px;background:#fff4d6;border:3px solid #38856e}
+.turn{font-size:31px;font-weight:800;color:#85e6b9;text-align:center;font-variant-numeric:tabular-nums;margin-top:12px}.instruction{font-size:18px;font-weight:700;text-align:center;line-height:1.6;min-height:55px}.quality{margin:9px auto 2px;width:fit-content;background:#5d492d;color:#fce5ad;border-radius:80px;padding:8px 12px;font-size:12px;text-align:center}.quality[data-kind=good]{background:#1e5744;color:#c7ffe8}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}button{border:0;border-radius:14px;padding:14px 15px;flex:1;min-width:120px;background:#2b5360;color:white;font-size:15px;font-weight:700;cursor:pointer}button.primary{background:#35b88b;color:#072521}button:disabled{opacity:.6}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{padding:12px;border:1px solid #2b4953;border-radius:13px;background:#0b1c2a}.stat span{display:block;color:#9ab3bd;font-size:12px;margin-bottom:6px}.stat b{font-size:20px;font-variant-numeric:tabular-nums}
+details summary{cursor:pointer;padding:4px 0;font-size:17px;font-weight:700}label{display:block;font-size:13px;color:#bdcfd3;margin:12px 0 5px}input,select{width:100%;font:inherit;color:#fff;background:#0b1a27;border:1px solid #415b65;border-radius:11px;padding:12px;direction:ltr;text-align:left}select{direction:rtl;text-align:right}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fine{font-size:12px;color:#a0bac2;line-height:1.9}.info{border-top:1px solid #38515c;padding-top:14px;margin-top:16px}small{display:block;color:#9bb4bb;font-size:12px;line-height:1.8}
+@media(max-width:370px){h1{font-size:19px}.card{padding:13px}.stat b{font-size:17px}}
+</style></head>
+<body><main>
+<header><div><h1>🧭 BAS قبلة البر</h1><p class="muted">اتجاه القبلة دون شبكة أو إنترنت</p></div><span class="tag">نسخة مستقلة</span></header>
+<div class="status" id="notice" role="status">ابدأ بتحديد الموقع</div>
+<section class="card">
+<div class="muted" style="text-align:center" id="posStatus">الموقع غير محدد</div>
+<div class="compass" aria-label="السهم الأخضر يشير إلى القبلة بالنسبة لأعلى الهاتف">
+<span class="dir n">N</span><span class="dir e">E</span><span class="dir s">S</span><span class="dir w">W</span>
+<div class="needle" id="needle"><svg viewBox="0 0 126 126" aria-hidden="true"><path d="M63 4 L86 88 L63 72 L40 88 Z" fill="#5ce7b0" stroke="#0c6048" stroke-width="3"/><path d="M63 4 L63 72 L40 88 Z" fill="#bfffe3" opacity=".75"/></svg></div><div class="center"></div></div>
+<div class="turn" id="degrees">—</div><div class="instruction" id="instruction">حدّد موقعك أولًا</div><div class="quality" id="quality">البوصلة غير مفعلة</div>
+<div class="actions"><button class="primary" id="locate">تحديد GPS</button><button id="start">تشغيل البوصلة</button></div>
+<small id="gpsQuality">لم تُقرأ دقة GPS</small><small id="sensorQuality">البوصلة لم تبدأ</small><small id="source">لا توجد قراءة لاتجاه الهاتف</small>
+</section>
+<section class="card"><div class="stats">
+<div class="stat"><span>زاوية القبلة الحقيقية</span><b id="bearing">—</b></div>
+<div class="stat"><span>اتجاه أعلى الهاتف الحقيقي</span><b id="heading">—</b></div>
+<div class="stat"><span>الانحراف المغناطيسي</span><b id="declination">—</b></div>
+<div class="stat"><span>المسافة الجوية لمكة</span><b id="distance">—</b></div>
+</div></section>
+<section class="card"><details><summary>📍 موقع احتياطي: مدينة أو إحداثيات</summary>
+<p class="fine">إذا تعطل GPS أدخل الإحداثيات من جهاز ملاحة. اختيار المدينة تقريبي وقد يكون غير مناسب إذا كنت بعيدًا عنها في البر.</p>
+<label for="cities">اختيار مركز مدينة تقريبي</label>
+<select id="cities"><option value="">اختر مدينة عند الحاجة</option><option value="28.3838,36.5662">تبوك</option><option value="29.9697,40.2064">سكاكا</option><option value="24.4672,39.6111">المدينة المنورة</option><option value="24.7136,46.6753">الرياض</option><option value="21.4858,39.1925">جدة</option><option value="26.4207,50.0888">الدمام</option></select>
+<div class="two"><div><label for="lat">خط العرض Latitude</label><input type="number" id="lat" step="any" placeholder="28.3838"></div><div><label for="lon">خط الطول Longitude</label><input type="number" id="lon" step="any" placeholder="36.5662"></div></div>
+<div class="actions"><button id="saveManual">استخدم الإحداثيات المدخلة</button></div>
+</details></section>
+<section class="card"><details><summary>🔧 وضع الطوارئ: بوصلة خارجية</summary><p class="fine">إذا لم تسمح بوصلة المتصفح بالاتجاه الحي، أدخل قراءة الشمال المغناطيسي من بوصلة مستقلة موثوقة. هذا الإدخال ثابت ولا يتغير عند دوران الهاتف.</p>
+<label for="manualHeading">اتجاه أعلى الهاتف من الشمال المغناطيسي (٠–٣٥٩)</label><input id="manualHeading" type="number" min="0" max="359" step="any" placeholder="مثال 180">
+<div class="actions"><button id="setHeading">استخدم الاتجاه اليدوي</button></div>
+</details></section>
+<section class="card"><strong>📦 حالة التشغيل دون إنترنت</strong><p class="fine" id="offline">التجهيز الأول يتطلب اتصالًا</p><p class="fine info">نصيحة للبر: افتح التطبيق وفعّل الموقع والبوصلة وأنت متصل مرة واحدة، ثم فعّل نمط الطيران مع إبقاء خدمات الموقع مفعلة واختبره بعيدًا عن السيارة. لا تعتمد على قراءة بوصلة تتأثر بالمغناطيس أو على موقع قديم.</p><small>حساب الاتجاه على الجهاز. تصحيح الانحراف المغناطيسي وفق WMM2025 حتى نهاية ٢٠٢٩. لا توجد اتصالات بخوادم أو حسابات ولا تخزين لتاريخ المواقع.</small></section>
+</main><script src="./wmm.js"></script><script src="./app.js"></script></body></html>
