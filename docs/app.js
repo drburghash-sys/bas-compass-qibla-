@@ -18,7 +18,28 @@ function coordinates(lat,lon){
  const a=Math.sin((m-p)/2)**2+Math.cos(p)*Math.cos(m)*Math.sin(l/2)**2;
  return {q:wrap(deg(Math.atan2(y,x))),distance:6371.0088*2*Math.asin(Math.sqrt(Math.min(1,a)))};
 }
+// The fixed needle shows where the top of the phone points.
+// Cardinal directions and Kaaba are geographically fixed on the rotating dial.
+let previousHeading=NaN, smoothHeading=0;
+function renderDial(){
+ const headingAvailable=Number.isFinite(heading)&&Number.isFinite(decl);
+ if(headingAvailable){
+  if(!Number.isFinite(previousHeading))smoothHeading=heading;
+  else smoothHeading+=delta(heading-previousHeading);
+  previousHeading=heading;
+  el("dial").style.transform="rotate("+(-smoothHeading)+"deg)";
+ }else previousHeading=NaN;
+ const canShowKaaba=headingAvailable&&Number.isFinite(qibla);
+ el("qiblaTrack").hidden=!canShowKaaba;
+ el("compass").dataset.active=canShowKaaba?"yes":"no";
+ if(canShowKaaba){
+  el("qiblaTrack").style.transform="rotate("+qibla+"deg)";
+  el("kaabaMark").style.transform="translateX(-50%) rotate("+(smoothHeading-qibla)+"deg)";
+ }
+}
+
 function render(){
+ renderDial();
  text("posStatus",loc?({gps:"GPS الحالي",manual:"إحداثيات يدوية",city:"مركز مدينة تقريبي",saved:"موقع محفوظ"}[loc.source]||"موقع")+" • "+val(loc.lat,5)+"، "+val(loc.lon,5):"الموقع غير محدد");
  text("gpsQuality",loc&&loc.source==="gps"?"دقة GPS: ±"+Math.round(loc.accuracy)+" متر":loc?"هذا ليس موقع GPS مباشرًا":"لم يتحدد الموقع");
  text("bearing",Number.isFinite(qibla)?val(qibla)+"°":"—");
@@ -30,15 +51,15 @@ function render(){
  text("offline",cacheReady?"ملفات التطبيق محفوظة على هذا الهاتف للعمل دون إنترنت":"افتح الموقع متصلًا مرة أولًا وتأكد من جاهزية الحفظ");
  if(!Number.isFinite(qibla)){text("instruction","حدّد موقعك أولًا");text("degrees","—");return;}
  if(!Number.isFinite(heading)||!Number.isFinite(decl)){
-  text("instruction","القبلة محسوبة، لكن السهم يحتاج اتجاه هاتف موثوقًا");
+  text("instruction","القبلة محسوبة، لكن القرص يحتاج قراءة بوصلة صالحة");
   text("degrees",val(qibla)+"° من الشمال الحقيقي");
   text("quality","المحاذاة الحية غير متاحة");el("quality").dataset.kind="warn";
-  el("needle").style.transform="translate(-50%,-50%) rotate(0deg)";return;
+  return;
  }
  const d=delta(qibla-heading);
- el("needle").style.transform="translate(-50%,-50%) rotate("+d+"deg)";
+ 
  text("degrees",val(Math.abs(d),0)+"°");
- text("instruction",Math.abs(d)<=3?"أعلى الهاتف باتجاه القبلة حسابيًا":"أدر أعلى الهاتف "+val(Math.abs(d),0)+"° "+(d>0?"يمينًا":"يسارًا"));
+ text("instruction",Math.abs(d)<=3?"علامة الكعبة عند السهم الثابت؛ أعلى الهاتف باتجاه القبلة حسابيًا":"أدر أعلى الهاتف "+val(Math.abs(d),0)+"° "+(d>0?"يمينًا":"يسارًا")+" لتصل الكعبة إلى المؤشر");
  const valid=loc&&loc.source==="gps"&&Number.isFinite(accuracy)&&accuracy>=0&&accuracy<=10;
  text("quality",valid?"القراءة مقبولة مبدئيًا":"تحقق من البوصلة والموقع قبل الاعتماد");
  el("quality").dataset.kind=valid?"good":"warn";
@@ -136,7 +157,7 @@ try{
 }catch(e){render();}
 if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){
  navigator.serviceWorker.register("./sw.js").then(()=>navigator.serviceWorker.ready).then(async()=>{
-  const c=await caches.open("bas-qibla-offline-v1");
+  const c=await caches.open("bas-qibla-offline-v2");
   cacheReady=!!(await c.match("./index.html"));render();
  }).catch(()=>render());
 }
