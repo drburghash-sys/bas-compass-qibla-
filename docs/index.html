@@ -19,15 +19,58 @@ main{max-width:560px;margin:auto}header{display:flex;align-items:center;justify-
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{padding:12px;border:1px solid #2b4953;border-radius:13px;background:#0b1c2a}.stat span{display:block;color:#9ab3bd;font-size:12px;margin-bottom:6px}.stat b{font-size:20px;font-variant-numeric:tabular-nums}
 details summary{cursor:pointer;padding:4px 0;font-size:17px;font-weight:700}label{display:block;font-size:13px;color:#bdcfd3;margin:12px 0 5px}input,select{width:100%;font:inherit;color:#fff;background:#0b1a27;border:1px solid #415b65;border-radius:11px;padding:12px;direction:ltr;text-align:left}select{direction:rtl;text-align:right}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fine{font-size:12px;color:#a0bac2;line-height:1.9}.info{border-top:1px solid #38515c;padding-top:14px;margin-top:16px}small{display:block;color:#9bb4bb;font-size:12px;line-height:1.8}
 @media(max-width:370px){h1{font-size:19px}.card{padding:13px}.stat b{font-size:17px}}
+
+/* Offline Qibla v2: fixed heading needle, rotating geographic dial */
+.compass{width:min(80vw,350px);height:min(80vw,350px);border:0;overflow:visible;
+ background:radial-gradient(circle at 50% 45%,#143448 0%,#0c263a 72%,#091824 100%);
+ box-shadow:0 0 0 4px #1a4b60,0 0 0 7px #416775,0 12px 45px #0008}
+.dial{position:absolute;inset:0;border-radius:50%;border:11px solid #08a7ce;
+ background:radial-gradient(circle,#163e53 0%,#0c2639 69%,#102c40 100%);
+ box-shadow:inset 0 0 0 3px #62d1e9,inset 0 0 0 9px #09354c;
+ transform:rotate(0deg);transition:transform .16s linear;will-change:transform}
+.dial::before{content:"";position:absolute;inset:18px;border:2px solid #748d9c80;border-radius:50%;pointer-events:none}
+.ticks{position:absolute;inset:9px;border-radius:50%;
+ background:repeating-conic-gradient(from 0deg,#e2f4f2 0 1deg,transparent 1deg 10deg);
+ -webkit-mask:radial-gradient(circle,transparent 0 83%,black 84% 88%,transparent 89%);
+ mask:radial-gradient(circle,transparent 0 83%,black 84% 88%,transparent 89%);opacity:.85}
+.dir{position:absolute;display:grid;place-items:center;font-size:23px;font-weight:900;
+ color:#eaf2f0;width:40px;height:40px;text-align:center;z-index:2;
+ text-shadow:0 2px 8px #001e2b;transform:none}
+.n{top:22px;left:calc(50% - 20px);color:#f5b56f;transform:none}
+.s{bottom:22px;left:calc(50% - 20px);transform:none}
+.e{right:22px;left:auto;top:calc(50% - 20px);transform:none}
+.w{left:22px;right:auto;top:calc(50% - 20px);transform:none}
+.qibla-track{position:absolute;inset:0;border-radius:50%;z-index:4;transform:rotate(0deg);pointer-events:none}
+.qibla-marker{position:absolute;top:-17px;left:50%;width:47px;height:47px;border-radius:50%;
+ display:grid;place-items:center;transform:translateX(-50%);
+ font-size:30px;background:#f9f4e7;color:#0b2230;border:3px solid #e8c78b;
+ box-shadow:0 3px 12px #0009;transition:transform .16s linear}
+.fixed-needle{position:absolute;width:80px;height:170px;top:50%;left:50%;
+ transform:translate(-50%,-50%);z-index:5;pointer-events:none;
+ filter:drop-shadow(0 4px 9px #0009)}
+.fixed-needle svg{display:block;width:100%;height:100%}
+.center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+ z-index:6;width:20px;height:20px;background:#faf1df;border:4px solid #239b7b;
+ box-shadow:0 2px 12px #0018}
+.dial-hint{text-align:center;font-size:12px;color:#a9c8d1;margin:-1px 4px 12px;line-height:1.8}
+.compass[data-active="no"] .fixed-needle{opacity:.58}
+@media(prefers-reduced-motion:reduce){.dial,.qibla-marker{transition:none}}
 </style></head>
 <body><main>
 <header><div><h1>🧭 BAS قبلة البر</h1><p class="muted">اتجاه القبلة دون شبكة أو إنترنت</p></div><span class="tag">نسخة مستقلة</span></header>
 <div class="status" id="notice" role="status">ابدأ بتحديد الموقع</div>
 <section class="card">
 <div class="muted" style="text-align:center" id="posStatus">الموقع غير محدد</div>
-<div class="compass" aria-label="السهم الأخضر يشير إلى القبلة بالنسبة لأعلى الهاتف">
-<span class="dir n">N</span><span class="dir e">E</span><span class="dir s">S</span><span class="dir w">W</span>
-<div class="needle" id="needle"><svg viewBox="0 0 126 126" aria-hidden="true"><path d="M63 4 L86 88 L63 72 L40 88 Z" fill="#5ce7b0" stroke="#0c6048" stroke-width="3"/><path d="M63 4 L63 72 L40 88 Z" fill="#bfffe3" opacity=".75"/></svg></div><div class="center"></div></div>
+<div class="compass" id="compass" data-active="no" aria-label="المؤشر الأخضر ثابت. قرص الشمال وعلامة الكعبة يدوران مع حركة الهاتف">
+  <div class="dial" id="dial">
+    <div class="ticks" aria-hidden="true"></div>
+    <span class="dir n">N</span><span class="dir e">E</span><span class="dir s">S</span><span class="dir w">W</span>
+    <div class="qibla-track" id="qiblaTrack" hidden><span class="qibla-marker" id="kaabaMark" aria-label="اتجاه الكعبة">🕋</span></div>
+  </div>
+  <div class="fixed-needle" aria-hidden="true"><svg viewBox="0 0 80 170"><path d="M40 4 L68 115 L40 100 L12 115 Z" fill="#52edba" stroke="#0e684f" stroke-width="3"/><path d="M40 4 L40 100 L12 115 Z" fill="#cbffed" opacity=".7"/><path d="M40 100 L63 145 L40 134 L17 145 Z" fill="#829cab" opacity=".75"/></svg></div>
+  <span class="center"></span>
+</div>
+<p class="dial-hint">السهم الأخضر ثابت • حرّك الجوال حتى تصبح علامة 🕋 عند أعلى القرص</p>
 <div class="turn" id="degrees">—</div><div class="instruction" id="instruction">حدّد موقعك أولًا</div><div class="quality" id="quality">البوصلة غير مفعلة</div>
 <div class="actions"><button class="primary" id="locate">تحديد GPS</button><button id="start">تشغيل البوصلة</button></div>
 <small id="gpsQuality">لم تُقرأ دقة GPS</small><small id="sensorQuality">البوصلة لم تبدأ</small><small id="source">لا توجد قراءة لاتجاه الهاتف</small>
